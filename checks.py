@@ -1,45 +1,53 @@
 import requests
 
-def check_sql_injection(url):
-    payloads = [
-        "'",
-        "1' OR '1'='1",
-        "1' OR '1'='1' --",
-        '"',
-        '1" OR "1"="1',
-        '1" OR "1"="1" --',
-        '")',
-        '") OR ("1"="1',
-        '") OR ("1"="1" --',
-        "')",
-        "') OR ('1'='1",
-        "') OR ('1'='1' --",
-        "';",
-        '";',
-        '"; SELECT * FROM users; --',
-        "'; SELECT * FROM users; --",
-        "') UNION SELECT * FROM users; --",
-        '") UNION SELECT * FROM users; --',
-    ]
+class XSSChecker:
+    def __init__(self):
+        self.payloads = ["<script>alert('XSS')</script>", "<img src='x' onerror='alert(\"XSS\")'>", "<svg/onload=alert('XSS')>"]
 
-    vulnerabilities = []
+    def check_vulnerabilities(self, url):
+        vulnerabilities = []
+        for payload in self.payloads:
+            modified_url = url.replace('[[PAYLOAD]]', payload)
+            response = requests.get(modified_url)
+            if payload in response.text:
+                vulnerabilities.append(payload)
+        return vulnerabilities
 
-    for payload in payloads:
-        modified_url = url.replace("FUZZ", payload)
-        response = requests.get(modified_url)
+class SQLInjectionChecker:
+    def __init__(self):
+        self.payloads = ["' OR '1'='1", "'; DROP TABLE users;--", "UNION ALL SELECT NULL, NULL, NULL, NULL, NULL, CONCAT('SQL Injection') FROM information_schema.tables--"]
 
-        if self.is_vulnerable(response):
-            vulnerabilities.append(f"Potansiyel SQL Injection açığı bulundu: {modified_url}")
+    def check_vulnerabilities(self, url):
+        vulnerabilities = []
+        for payload in self.payloads:
+            modified_url = url.replace('[[PAYLOAD]]', payload)
+            response = requests.get(modified_url)
+            if "error" in response.text:
+                vulnerabilities.append(payload)
+        return vulnerabilities
 
-    return vulnerabilities
+class DirectoryTraversalChecker:
+    def __init__(self):
+        self.payloads = ["../../../../../etc/passwd", "../../../../etc/hosts", "../../../../etc/shadow"]
 
-def is_vulnerable(response):
-    # Error-Based SQL Injection kontrolü
-    if "error" in response.text.lower():
-        return True
+    def check_vulnerabilities(self, url):
+        vulnerabilities = []
+        for payload in self.payloads:
+            modified_url = url.replace('[[PAYLOAD]]', payload)
+            response = requests.get(modified_url)
+            if "root:" in response.text:
+                vulnerabilities.append(payload)
+        return vulnerabilities
 
-    # Blind-Based SQL Injection kontrolü
-    # Burada, belirli bir mantıkla yanıtları analiz edebilirsiniz
-    # Örneğin, zaman gecikmeleri, beklenmeyen sonuçlar veya hata mesajlarına bakabilirsiniz
+class CommandInjectionChecker:
+    def __init__(self):
+        self.payloads = ["; ls", "| ls", "$(ls)"]
 
-    return False
+    def check_vulnerabilities(self, url):
+        vulnerabilities = []
+        for payload in self.payloads:
+            modified_url = url.replace('[[PAYLOAD]]', payload)
+            response = requests.get(modified_url, shell=True)
+            if "file1.txt" in response.text:
+                vulnerabilities.append(payload)
+        return vulnerabilities
